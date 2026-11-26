@@ -138,7 +138,13 @@ window.createRoomWalker=(T,source,home)=>{
   const coat=color('#244f63'), skin=color('#c48b64'), trousers=color('#39424b'), shoes=color('#20252b'),hair=color('#443228');
   const sphere=new T.SphereGeometry(1,12,8);
   const mesh=(parent,x,y,z,a,b,c,material)=>{
-    const node=new T.Mesh(sphere,material);node.position.set(x,y,z);node.scale.set(a,b,c);parent.add(node);return node;
+    const node=new T.Mesh(sphere,material);
+    node.position.set(x,y,z);
+    node.scale.set(a,b,c);
+    node.matrixAutoUpdate=false;
+    node.updateMatrix();
+    parent.add(node);
+    return node;
   };
   const body=new T.Group();avatar.add(body);
   mesh(body,0,1.12,0,.143,.255,.105,coat);
@@ -176,9 +182,11 @@ window.createRoomWalker=(T,source,home)=>{
     },
     stride(distance,amount){
       const stride=Math.sin(distance*10.4)*amount;
-      body.position.y=Math.abs(stride)*.021;
+      body.position.y=Math.abs(stride)*.024;
+      body.rotation.z=stride*-.032;
       legs.forEach((g,i)=>{g.rotation.x=stride*(i?-.49:.49);});
       arms.forEach((g,i)=>{g.rotation.x=stride*(i?.41:-.41);});
+      ring.scale.setScalar(1+Math.abs(stride)*.08);
     }
   };
 };

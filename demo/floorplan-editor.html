@@ -1,61 +1,14 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>智能家居 · 户型控制台</title><link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="common.css">
-<link rel="icon" href="data:,">
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0; url=./index.html?plan=apartment&amp;view=2d">
+<title>跳转至智能家居统一工作台</title>
+<script>
+  const q = new URLSearchParams(location.search);
+  const plan = q.get('plan') || 'apartment';
+  location.replace(`./index.html?plan=${encodeURIComponent(plan)}&view=2d`);
+</script>
 </head>
-<body>
-<header class="top">
-  <a class="brand" href="./index.html">回到 3D</a>
-  <div class="scene"><span>场景</span><div role="group" aria-label="场景" id="modes"><button data-mode="home">回家</button><button data-mode="away">离家</button><button data-mode="sleep">睡眠</button></div></div>
-  <div class="top-status" id="connection"><i></i>本地模拟</div>
-</header>
-<main class="workspace">
-<aside class="library">
-  <section><h2>户型来源</h2><div class="source-list" id="sources">
-  <button data-load="apple"><b>已扫描客厅</b></button>
-  <button data-load="house"><b>整套扫描户型</b></button>
-  <button data-load="custom"><b>我的户型</b></button>
-  </div><label class="import">导入户型 / RoomPlan JSON<input id="importFile" type="file" accept=".json,application/json"></label>
-  <button id="exportPlan" class="import" type="button">导出户型 JSON</button></section>
-  <section><h2>家具和设备</h2><p class="hint">选中后点击图中位置，也可拖入画布。</p><div class="catalog" id="catalog"></div></section>
-  <section><h2>房间</h2><div class="rooms" id="rooms"></div></section>
-</aside>
-<section class="studio">
-  <div class="studio-head"><div><div class="eyebrow" id="sourceName"></div><h1 id="planTitle">客厅平面图</h1></div><div class="actions"><button id="cancelPlace" class="hidden">取消摆放</button><button id="save">保存布局</button></div></div>
-  <div class="drawing-tools">
-    <button id="drawRoom" aria-pressed="false">画房间</button><button id="drawWall" aria-pressed="false">画墙</button>
-    <button id="undoDrawing" disabled>撤销墙线</button>
-    <label>房名 <input id="roomName" maxlength="25" placeholder="例如客厅"></label>
-    <label><input id="quietRoom" type="checkbox"> 睡眠房间</label>
-  </div>
-  <div class="stage" id="stage">
-    <svg id="plan" aria-label="可编辑的二维平面图" role="group" preserveAspectRatio="xMidYMid meet"></svg>
-    <div class="toast" id="notice" role="status" hidden></div>
-  </div>
-    <div class="map-foot"><span><i class="square"></i> 墙体 <i class="legend-door"></i> 门洞 <i class="legend-light"></i> 灯</span><span id="scale"></span></div>
-  <div class="studio-foot"><span id="stats"></span><span id="saveState">布局保存在当前浏览器</span></div>
-</section>
-<aside class="inspector">
-  <h2>设备与家具</h2>
-  <label class="item-filter"><input id="itemSearch" type="search" placeholder="搜索物品或设备" aria-label="搜索物品或设备"></label>
-  <label class="item-filter">类别 <select id="itemType" aria-label="按类别筛选"><option value="">全部</option></select></label>
-  <div id="inspect"></div>
-  <div id="deviceHistory" hidden></div>
-  <section><h2>人体感应模拟</h2><p class="hint" id="scenarioHelp">打开睡眠场景，再切换公共区域的有人／无人。</p><div id="sensors"></div></section>
-  <section id="climatePanel" hidden><h2>环境模拟</h2>
-    <form id="climateForm">
-      <label>季节 <select name="season"><option>春</option><option selected>夏</option><option>秋</option><option>冬</option></select></label>
-      <label>室内 °C <input name="indoor" type="number" min="0" max="45" step="0.5" value="30" required></label>
-      <label>室外 °C <input name="outdoor" type="number" min="-25" max="52" step="0.5" value="33" required></label>
-      <label>关灯延时（秒） <input name="delay" type="number" min="1" max="60" value="5" required></label>
-      <button type="submit">应用</button>
-    </form></section>
-  <section><h2>操作记录</h2><ol id="activity"></ol></section>
-</aside>
-</main>
-<script src="assets/apple-roomplan/sample.js"></script><script src="assets/apple-roomplan/projected.js"></script><script src="api.js"></script><script src="app.js"></script>
-</body>
+<body></body>
 </html>

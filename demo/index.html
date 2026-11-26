@@ -3,67 +3,184 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>智能家居</title>
-<link rel="stylesheet" href="common.css">
+<title>家庭</title>
 <link rel="stylesheet" href="room.css">
 <link rel="icon" href="data:,">
 </head>
 <body>
 <main class="sheet">
   <div class="workspace">
-    <section class="stage-shell" aria-label="户型视图">
-      <div class="viewport" id="viewport" aria-label="同一个模型的 2D 和 3D 视图">
-        <img id="fallback" src="assets/apple-roomplan/original-perspective.png" alt="Apple RoomPlan 客厅扫描模型的预览">
-        <p id="renderError" class="render-error" role="status" hidden>无法启动 3D 渲染 · 显示客厅预览</p>
+    <!-- Left Stage: Continuous 3D/2D WebGL Viewport + Bottom Floating Pill -->
+    <section class="stage-shell" aria-label="空间视图">
+      <div class="viewport" id="viewport" aria-label="2D 与 3D 连续视图">
+        <img id="fallback" src="assets/apple-roomplan/original-perspective.png" alt="客厅预览" hidden>
+        <p id="renderError" class="render-error" role="status" hidden>无法启动 3D 渲染</p>
+        <div id="stageToast" class="stage-toast" role="status" hidden></div>
       </div>
-      <div class="view-tools glass">
-        <div class="view-switch" role="group" aria-label="视角">
+
+      <div class="view-tools glass" role="toolbar" aria-label="视角">
+        <div class="view-switch" role="group" aria-label="维度">
           <button id="orbitView" type="button" aria-pressed="true">3D</button>
           <button id="topView" type="button" aria-pressed="false">2D</button>
         </div>
         <div class="view-actions">
           <button type="button" id="walkToggle" aria-pressed="false">进入户型</button>
+          <button type="button" id="installBulb" aria-pressed="false">安装灯泡</button>
           <button type="button" id="reset" aria-label="复位视角" title="复位视角">
-            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v5h5M4.5 9A8 8 0 1 1 4 15"/></svg>
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v5h5M4.5 9A8 8 0 1 1 4 15"/></svg>
           </button>
         </div>
       </div>
     </section>
-    <aside class="details glass" aria-label="房间和设备">
-      <section class="rooms-panel" aria-labelledby="roomsTitle">
-        <div class="detail-heading"><h2 id="roomsTitle">房间</h2><button id="wholeHome" type="button" aria-pressed="true">全屋</button></div>
-        <div id="roomList" class="room-list" aria-label="定位房间"></div>
-        <div id="adjacent" class="adjacent" hidden><div class="detail-heading"><h2>通往</h2></div><div id="roomLinks" class="room-list"></div></div>
-        <p id="walkStatus" class="walk-status" role="status" hidden></p>
-      </section>
-      <details class="furniture-panel"><summary>家具显示</summary>
-        <label class="visibility"><input id="objects" type="checkbox" checked><span>显示家具</span></label>
-        <ul id="legend" class="legend" aria-label="家具分类"></ul>
-        <label class="color-setting"><input id="colors" type="checkbox" checked> 按类别着色</label>
-      </details>
-      <section class="lighting" aria-labelledby="lightTitle">
-        <div class="detail-heading"><h2 id="lightTitle">客厅灯泡</h2><button id="installBulb" type="button" aria-pressed="false">安装灯泡</button></div>
-        <p class="placement-note" id="bulbNotice" role="status"></p>
-        <div class="bulb-list" id="bulbList" role="group" aria-label="已安装灯泡"></div>
-        <div id="bulbControls" hidden>
-          <div class="bulb-actions">
-            <button id="lamp" type="button" aria-pressed="false">开灯</button>
-            <button id="inspectBulb" type="button" aria-pressed="false">看细节</button>
-            <button id="removeBulb" type="button">移除</button>
-          </div>
-          <label class="level" for="brightness"><span>亮度</span><output id="brightnessValue">60%</output></label>
-          <input type="range" id="brightness" min="1" max="100" value="60">
+
+    <!-- Right Floating Glass Card: Calm, Minimalist Apple Home Control -->
+    <aside class="details glass" aria-label="家庭控制">
+      <header class="panel-top">
+        <button id="homeMenuBtn" type="button" class="home-picker" aria-haspopup="listbox" aria-expanded="false">
+          <span id="homeTitleText">我的家</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button id="moreMenuBtn" type="button" class="more-btn" aria-label="更多选项" aria-haspopup="listbox" aria-expanded="false">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+        </button>
+      </header>
+
+      <!-- Scenes: Clean 4-pill Segmented Strip -->
+      <div class="scene-bar" id="sceneStrip" role="group" aria-label="场景"></div>
+
+      <!-- Rooms: Clean 4-column Symmetrical Grid + Adjacent Links -->
+      <section class="panel-block" aria-label="房间">
+        <div class="room-grid" id="roomList" role="tablist"></div>
+        <div id="adjacent" class="adjacent-row" hidden>
+          <span>通往</span>
+          <div id="roomLinks" class="adjacent-links"></div>
         </div>
+        <p id="walkStatus" class="quiet-status" role="status" hidden></p>
       </section>
-      <footer class="source"><a href="https://developer.apple.com/documentation/roomplan/merging-multiple-scans-into-a-single-structure">Apple RoomPlan 样例</a></footer>
+
+      <!-- Accessories: Clean 2-Column Tiles + Direct Tactile Control -->
+      <section class="panel-block" aria-label="设备">
+        <p class="quiet-status" id="bulbNotice" role="status"></p>
+        <div class="acc-grid" id="deviceChips" role="group" aria-label="设备"></div>
+        <div id="deviceControls" class="ctrl-area"></div>
+      </section>
+
+      <!-- Minimalist Voice Assistant & Indoor Room Camera Bar -->
+      <div class="assistant-wrap">
+        <div id="camStrip" class="indoor-cam-card" hidden>
+          <div class="indoor-cam-frame">
+            <img id="camThumb" alt="房间室内摄像头实时画面">
+            <button type="button" id="camRoomSwitchBtn" class="cam-badge-btn" aria-haspopup="listbox">
+              <span class="cam-live-dot" aria-hidden="true"></span>
+              <span id="camRoomLabel">客厅镜头</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button type="button" id="clearCamBtn" class="cam-close-btn" aria-label="关闭画面">✕</button>
+          </div>
+          <input type="file" id="camUploadInput" accept="image/*" hidden>
+        </div>
+        <div id="replyBubble" class="siri-card" hidden></div>
+        <form id="butlerForm" class="ask-bar">
+          <button type="button" id="snapViewBtn" class="ask-cam-btn" title="查看房间室内摄像头" aria-label="查看房间室内摄像头">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </button>
+          <input id="butlerInput" type="text" placeholder="控制灯光、问温度或看房间…" autocomplete="off">
+          <button type="submit" class="ask-send-btn" aria-label="发送">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
+        </form>
+      </div>
     </aside>
   </div>
 </main>
+
+<!-- Sheet: Environment & Room DND (Opened from `⋯` menu) -->
+<dialog id="envModal" class="glass modal-sheet">
+  <form id="envForm" class="modal-body">
+    <div class="modal-head">
+      <h2>环境与传感器</h2>
+      <button type="button" class="close-circle" data-close="envModal" aria-label="关闭">✕</button>
+    </div>
+    <div class="seg-bar" id="seasonSeg" role="radiogroup" aria-label="季节">
+      <button type="button" data-season="春" aria-pressed="false">春</button>
+      <button type="button" data-season="夏" aria-pressed="true">夏</button>
+      <button type="button" data-season="秋" aria-pressed="false">秋</button>
+      <button type="button" data-season="冬" aria-pressed="false">冬</button>
+    </div>
+    <input type="hidden" name="season" value="夏">
+    <div class="grid-3">
+      <label class="field-box"><span>室温 °C</span><input type="number" name="indoor" step="0.5" value="26"></label>
+      <label class="field-box"><span>湿度 %</span><input type="number" name="humidity" value="55"></label>
+      <label class="field-box"><span>照度 lx</span><input type="number" name="lux" value="120"></label>
+    </div>
+    <div id="occMatrix" class="occ-list"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn-secondary" data-close="envModal">完成</button>
+      <button type="submit" class="btn-primary">更新环境</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Sheet: Add Accessory Type (Opened from `⋯` menu) -->
+<dialog id="typeModal" class="glass modal-sheet">
+  <form id="typeForm" class="modal-body">
+    <div class="modal-head">
+      <h2>添加配件类型</h2>
+      <button type="button" class="close-circle" data-close="typeModal" aria-label="关闭">✕</button>
+    </div>
+    <div class="grid-2">
+      <label class="field-box"><span>编码</span><input name="code" value="purifier" required></label>
+      <label class="field-box"><span>名称</span><input name="name" value="新风除湿机" required></label>
+    </div>
+    <div class="grid-2">
+      <label class="field-box"><span>参数键</span><input name="capKey" value="target_rh" required></label>
+      <label class="field-box"><span>参数名</span><input name="capLabel" value="目标湿度" required></label>
+    </div>
+    <div class="grid-3">
+      <label class="field-box"><span>最小值</span><input type="number" name="capMin" value="35"></label>
+      <label class="field-box"><span>最大值</span><input type="number" name="capMax" value="75"></label>
+      <label class="field-box"><span>单位</span><input name="capUnit" value="%"></label>
+    </div>
+    <p class="err-text" id="typeErr"></p>
+    <div class="modal-foot">
+      <button type="button" class="btn-secondary" data-close="typeModal">取消</button>
+      <button type="submit" class="btn-primary">添加</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Sheet: New Scene (Opened from `⋯` menu) -->
+<dialog id="sceneModal" class="glass modal-sheet">
+  <form id="sceneForm" class="modal-body">
+    <div class="modal-head">
+      <h2>新建场景</h2>
+      <button type="button" class="close-circle" data-close="sceneModal" aria-label="关闭">✕</button>
+    </div>
+    <div class="grid-2">
+      <label class="field-box"><span>标识</span><input name="id" value="reading" required></label>
+      <label class="field-box"><span>名称</span><input name="name" value="阅读" required></label>
+    </div>
+    <div class="field-box">
+      <span>配件</span>
+      <input type="hidden" name="deviceId" id="sceneDevValue">
+      <button type="button" id="sceneDevBtn" class="dropdown-trigger" aria-haspopup="listbox">
+        <span id="sceneDevLabel">选择配件</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <label class="field-box"><span>设定值</span><input name="val" value="85" placeholder="如 80 / 25 / true"></label>
+    <p class="err-text" id="sceneErr"></p>
+    <div class="modal-foot">
+      <button type="button" class="btn-secondary" data-close="sceneModal">取消</button>
+      <button type="submit" class="btn-primary">保存</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="vendor/three.min.js"></script>
 <script src="assets/apple-roomplan/home-mesh.js"></script>
 <script src="assets/led-bulb/bulb.js"></script>
 <script src="api.js"></script>
-<script src="bulbs.js"></script>
 <script src="walk.js"></script>
 <script src="room.js"></script>
 </body>

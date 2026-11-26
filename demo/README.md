@@ -1,17 +1,29 @@
-# 智能家居课设演示
+# 面向多成员差异化作息的家庭分域智能家居系统
 
-在此目录运行 `./start.sh`，打开 [本机演示](http://127.0.0.1:8768/)，默认口令 `2468`。运行只需要 Python 3.9+。数据库在 `.local/demo.sqlite3`，服务重启后仍保留。可用 `--db /path/to/demo.sqlite3` 指定另一数据库。
+软件工程课程设计演示工程（五层单向依赖架构 + 双栏空间控制台）。
 
-## 扫描户型
+## 启动与测试
 
-- 首页有 11 个房间。**3D** 是斜视，**2D** 用同一台正交相机转到正上方；两者共用 WebGL 场景、家具、灯具和交互面板。旧 `control-lab.html` 地址会转入首页的 2D 视角。
-- 点房间按钮定位；在「通往」选择相邻房间，镜头平滑移向相邻房间，并标出对应门槛。「全屋」返回总览。
-- 点「进入户型」让人物出现在走廊。点击地面或侧栏的房间让人物走过去；人物按扫描地面和碰撞几何寻路，不穿墙或家具。「退出行走」停在当前位置。
-- 点「安装灯泡」，再点客厅地面，灯泡装在点击点正上方。不用输入安装高度。开关、调光和灯泡细节在两种视角里都能使用。
-- 原手绘／JSON 户型编辑器和场景控制仍在 `floorplan-editor.html`，不在扫描户型的页面导航中。
+```bash
+./demo/start.sh --port 8768
+python3 demo/tests/test_rtm_all.py
+```
 
-## 数据与素材
+浏览器打开 [http://127.0.0.1:8768/](http://127.0.0.1:8768/)，支持三类家庭角色空间分域权限切换（右上角 `⋯` → `成员切换…`）：
+- **管理员**：`2468`（支持平面图编辑、动态添加配件类型、新建场景、CSV/JSON 批量导入导出与全屋控制）
+- **长辈成员**：`1357`（支持日常控制、场景切换与语音视觉交互，不可修改户型拓扑）
+- **临时访客**：`0000`（仅展示公共区域与客房，自动屏蔽主卧与长辈次卧的设备、在场状态与室内镜头）
 
-- [Apple RoomPlan 官方样例](https://developer.apple.com/documentation/roomplan/merging-multiple-scans-into-a-single-structure)：从 11 个 USDZ 读取三角网格，保留样例的房间相对位置，并统一同层地面高度。根据捕获的门洞和相邻开放边界，局部清理重叠墙片、补齐扫描接缝；没有另画 2D 户型。
-- 更新整屋网格：在 macOS 运行 `python3 tools/prepare-home.py /path/to/MergingMultipleScansIntoASingleStructure.zip`，需要 Swift 工具链。运行网页不需要 Xcode。
-- [Poly Haven Lightbulb LED](https://polyhaven.com/a/lightbulb_led)（CC0），详见 `assets/led-bulb/SOURCE.md`。设备能力参考 Matter，命令由演示服务模拟。
+## 五层架构目录结构
+
+- `index.html` / `room.css` / `room.js` / `walk.js` / `floorplan-editor.html` / `app.js`：**展示层** —— 左舞台同源 3D/2D 连续相机 WebGL 视口与人物寻路漫游，右侧毛玻璃控制面板、房间内墙角广角透视摄像头及多步协同轨迹卡片。
+- `backend/strategy/`：**策略层** —— `engine.py`（五级冲突仲裁、四季温湿滞回、自然底光补偿）、`hassil_grammar.py`（参考 OHF-Voice/HassIL 的中文意图槽位模板引擎）、`harness.py`（各房微气候与 `HomeAgentHarness` 多步工具编排器）及 `butler.py`（空缺槽位追问、室内视觉分析与统一路由）。
+- `backend/control/`：**控制层** —— 空间分域 RBAC 视图脱敏与写校验、能力值域白名单与跨属性互斥检查、二次确认令牌、CSV/JSON 原子导入导出与场景引用完整性检查。
+- `backend/device/`：**设备层** —— 参考 Matter 规范构建的配置驱动设备类型与能力注册表、软件设备模拟器（支持超时、离线与失败模拟）。
+- `backend/data/`：**数据层** —— 基于 SQLite WAL 事务模式的 `SQLiteRepository` 持久化实现（默认位于 `.local/demo.sqlite3`）。
+
+## 开源资产与许可说明
+
+- [Apple RoomPlan 多房间扫描样例](https://developer.apple.com/documentation/roomplan/merging-multiple-scans-into-a-single-structure)（详见 `assets/apple-roomplan/LICENSE.txt`）
+- [Three.js](https://threejs.org/)（MIT 协议，详见 `vendor/THREE-LICENSE.txt`）
+- [Poly Haven Lightbulb LED](https://polyhaven.com/a/lightbulb_led)（CC0 协议，详见 `assets/led-bulb/SOURCE.md`）

@@ -107,8 +107,9 @@ class ControlLayerService:
                 occupied_out.pop(rid, None)
             events = [ev for ev in events if "主卧" not in ev["message"] and "长辈" not in ev["message"]]
 
+        PINNED_THRESHOLD = now + 7200
         active_overrides = {
-            rid: max(0, int(round(exp - now)))
+            rid: (-1 if exp >= PINNED_THRESHOLD else max(1, int(round(exp - now))))
             for rid, exp in m.get("overrides", {}).items()
             if exp > now
         }
@@ -220,10 +221,12 @@ class ControlLayerService:
                 f"{item['name']} · {info}{staged_suffix}（手动控制）",
                 snapshot_state, source="manual"
             )
-            # Issue P1 Manual Override Lease for room so E1 sensors yield!
+            # Issue P1 Manual Override Lease for room so E1 sensors yield (keep pinned lock if already pinned)!
             if room:
                 ttl_sec = float(m.get("override_ttl", 15))
-                m["overrides"][room["id"]] = time.time() + ttl_sec
+                prev_exp = float(m["overrides"].get(room["id"], 0))
+                m["overrides"][room["id"]] = max(prev_exp, time.time() + ttl_sec)
+                m.get("due", {}).pop(room["id"], None)
                 if on_manual_override:
                     on_manual_override(key, m)
         else:
@@ -290,6 +293,13 @@ class ControlLayerService:
             snapshot_state = {k: item[k] for k in caps if k in item}
             info = self._format_cap_change(item, cap, val)
             self.repo.record_event(key, item["id"], "ok", f"{item['name']} · {info}（{reason}）", snapshot_state, source=source)
+            if source in ("slot_engine", "fallback", "local_vlm", "home_harness"):
+                rm_hit = room_for_item(m["plan"], item)
+                if rm_hit:
+                    ttl_sec = float(m.get("override_ttl", 15))
+                    prev_exp = float(m["overrides"].get(rm_hit["id"], 0))
+                    m["overrides"][rm_hit["id"]] = max(prev_exp, time.time() + ttl_sec)
+                    m.get("due", {}).pop(rm_hit["id"], None)
             applied.append({"deviceId": item["id"], "name": item["name"], "capability": cap, "value": val})
 
         if rejected and not applied:

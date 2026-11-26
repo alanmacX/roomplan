@@ -367,6 +367,48 @@ class TestSmartHomeRTM(unittest.TestCase):
             self.assertTrue(next(x for x in m_occ_after["plan"]["items"] if x["id"] == "living-lamp")["power"])
             self.assertFalse(next(x for x in m_occ_after["plan"]["items"] if x["id"] == "entry-lamp")["power"])
 
+    def test_tc17_auto_manual_cooperative_control_balance(self) -> None:
+        ctrl = self.app.control_layer
+        strat = self.app.strategy_layer
+        butler = self.app.butler_router
+        with self.app.repo.lock, self.app.repo.db:
+            # 1. Auto occupancy turns ON study lamp when dark (lux=85) and occupied
+            m = self.app.repo.read_model("apartment")
+            strat.update_environment("apartment", m, {"climate": {"lux": 85}, "room": "study", "occupied": True})
+            m = self.app.repo.read_model("apartment")
+            self.assertTrue(next(x for x in m["plan"]["items"] if x["id"] == "study-lamp")["power"])
+
+            # 2. User manually turns OFF study lamp (e.g. watching projector) -> issues Override Lease!
+            ctrl.dispatch_command("apartment", m, "study-lamp", {"capability": "power", "value": False}, role="admin")
+            snap = ctrl.project_snapshot("apartment", "admin")
+            self.assertIn("study", snap["overrides"])
+            self.assertGreater(snap["overrides"]["study"], 0)
+
+            # While override lease is active, new occupancy/lux sensor reports MUST NOT turn lamp back ON!
+            m = self.app.repo.read_model("apartment")
+            strat.update_environment("apartment", m, {"climate": {"lux": 60}, "room": "study", "occupied": True})
+            m = self.app.repo.read_model("apartment")
+            self.assertFalse(next(x for x in m["plan"]["items"] if x["id"] == "study-lamp")["power"])
+
+            # 3. Pin manual hold on living room -> survives 'home' scene without overwriting manual state!
+            ctrl.dispatch_command("apartment", m, "living-lamp", {"capability": "power", "value": False}, role="admin")
+            m = self.app.repo.read_model("apartment")
+            butler.handle_chat("apartment", m, {"text": "锁定客厅手动模式"}, "admin", "sess-bal")
+            snap_pin = ctrl.project_snapshot("apartment", "admin")
+            self.assertEqual(snap_pin["overrides"].get("living"), -1)
+
+            m = self.app.repo.read_model("apartment")
+            res_home = strat.trigger_scene("apartment", m, "home", "admin")
+            self.assertIn("客厅餐厅", res_home["skipped"])
+            m = self.app.repo.read_model("apartment")
+            self.assertFalse(next(x for x in m["plan"]["items"] if x["id"] == "living-lamp")["power"])
+
+            # 4. One-click / voice release back to Auto immediately resumes occupancy lighting!
+            butler.handle_chat("apartment", m, {"text": "恢复书房自动控制"}, "admin", "sess-bal")
+            m_after = self.app.repo.read_model("apartment")
+            self.assertNotIn("study", ctrl.project_snapshot("apartment", "admin")["overrides"])
+            self.assertTrue(next(x for x in m_after["plan"]["items"] if x["id"] == "study-lamp")["power"])
+
     def test_tc14_unidirectional_five_layer_architecture(self) -> None:
         allowed = {
             "data": {"common", "data"},

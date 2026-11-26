@@ -261,7 +261,39 @@ class IntentSlotEngine:
             return self._rbac_denied_reply()
         explicit_rooms = [r for r in all_mentioned_rooms if not r.get("restricted")]
 
-        # D. Exclusion Pattern ("除了主卧其他灯都关了", "除客厅外别的灯全关掉")
+        # C2. Auto / Manual Cooperative Control Balance Voice Intents
+        # ("恢复客厅自动控制", "解除客厅手动接管", "锁定客厅手动模式", "暂停书房自动感应")
+        if re.search(r"(?:恢复|切回|开启|交还|改回).*自动|(?:解除|取消|退出).*手动", t):
+            target_r = explicit_rooms[0] if explicit_rooms else (
+                next((r for r in plan["rooms"] if r["id"] == active_room and not r.get("restricted")), None) if active_room else None
+            )
+            rid_val = target_r["id"] if target_r else "__all__"
+            r_label = target_r["name"] if target_r else "全屋"
+            return {
+                "matched": True,
+                "override_op": ("release", rid_val),
+                "actions": [],
+                "reply": f"好的，{r_label}已恢复自动感知托管。",
+                "explanation": f"释放{r_label}手动接管租约，交还传感器自适应策略。",
+            }
+        if re.search(r"(?:固定|锁定|保持).*手动|(?:暂停|关闭|停用).*自动|不要自动", t):
+            target_r = explicit_rooms[0] if explicit_rooms else (
+                next((r for r in plan["rooms"] if r["id"] == active_room and not r.get("restricted")), None) if active_room else None
+            )
+            if not target_r:
+                opts = [{"label": r["name"], "text": f"锁定{r['name']}手动模式"} for r in plan["rooms"] if not r.get("restricted")][:5]
+                return {
+                    "matched": True, "query_only": True, "actions": [], "cards": [], "options": opts,
+                    "reply": "请问要将哪个房间固定为手动控制？",
+                    "explanation": "锁定手动控制缺少目标房间，发起澄清追问。",
+                }
+            return {
+                "matched": True,
+                "override_op": ("hold", target_r["id"]),
+                "actions": [],
+                "reply": f"好的，已将{target_r['name']}固定为手动控制，传感器不会自动改写设备。",
+                "explanation": f"为{target_r['name']}设置常驻手动接管锁。",
+            }
         m_excl = re.search(
             r"(?:除了|除开|只留)(.+?)(?:以外|之外|外|[，,\s]+|(?=其他|其余|别的|剩下|所有|全部|的?灯|的?空调|的?窗帘))(?:其他|其余|别的|剩下|所有|全部)?(.+)",
             t,
@@ -1671,6 +1703,20 @@ class HomeHubButlerRouter:
                 "cards": parsed.get("cards", []),
                 "options": parsed.get("options", []),
                 "camera_summary": parsed.get("camera_summary"),
+                "reply": parsed.get("reply", ""),
+                "explanation": parsed.get("explanation", ""),
+            }
+
+        if parsed.get("override_op"):
+            op_kind, rid_val = parsed["override_op"]
+            env_body = {"release_override": rid_val} if op_kind == "release" else {"hold_override": rid_val}
+            self.strategy.update_environment(key, m, env_body)
+            return {
+                "tier_used": tier_used,
+                "latency_ms": elapsed_ms,
+                "requires_confirm": False,
+                "applied": [{"name": "控制权移交", "capability": op_kind, "value": rid_val}],
+                "cards": [],
                 "reply": parsed.get("reply", ""),
                 "explanation": parsed.get("explanation", ""),
             }

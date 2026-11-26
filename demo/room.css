@@ -350,6 +350,56 @@ h2, p { margin: 0; }
 }
 .quiet-status:empty { display: none; }
 
+/* On-Demand Auto / Manual Cooperative Balance Pill (Hidden When Idle) */
+.takeover-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 8px 5px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  font-size: 0.75rem;
+  animation: softSlideIn 0.22s var(--ease-spring);
+}
+.takeover-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+}
+.takeover-dot {
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 999px;
+  flex: none;
+  background: #f59e0b;
+}
+.takeover-dot.is-pinned { background: #273946; }
+.takeover-dot.is-due { background: #0ea5e9; }
+.takeover-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.takeover-actions button {
+  height: 23px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.71rem;
+  font-weight: 590;
+  background: rgba(26, 36, 45, 0.075);
+  color: var(--ink);
+  transition: background 0.16s ease, color 0.16s ease, transform 0.15s var(--ease-spring);
+}
+.takeover-actions button:hover { background: var(--active); color: #fff; }
+.takeover-actions button:active { transform: scale(0.93); }
+
 /* Accessories: Clean Apple Home 2-Column Tiles */
 .acc-grid {
   display: grid;
@@ -1054,8 +1104,8 @@ dialog::backdrop {
 }
 .occ-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 5px;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 4px;
   align-items: center;
   font-size: 0.8rem;
   padding: 5px 8px;

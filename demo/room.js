@@ -1258,8 +1258,60 @@
       }
 
       renderDevices();
+      renderTakeoverBar();
       renderEnvModal();
       syncSlidingPills();
+    }
+
+    function renderTakeoverBar() {
+      const bar = el('takeoverBar');
+      if (!bar || !snapshot || !localPlan) return;
+      const ovs = snapshot.overrides || {};
+      const dues = snapshot.due || {};
+      const activeItem = localPlan.items.find(x => x.id === activeDeviceId);
+      const focusRid = selectedRoom || (activeItem && roomOfPlanItem(activeItem)?.id) || walkedRoom;
+
+      let rid = null;
+      if (focusRid && (ovs[focusRid] !== undefined || dues[focusRid] !== undefined)) rid = focusRid;
+      else rid = Object.keys(ovs)[0] || Object.keys(dues)[0] || null;
+
+      if (!rid) {
+        bar.hidden = true;
+        bar.innerHTML = '';
+        return;
+      }
+      const rObj = localPlan.rooms.find(r => r.id === rid);
+      if (!rObj || rObj.restricted) {
+        bar.hidden = true;
+        return;
+      }
+      const rName = shortRoomLabel(rObj);
+      if (ovs[rid] !== undefined) {
+        const sec = ovs[rid];
+        const pinned = sec < 0;
+        bar.innerHTML = `
+          <span class="takeover-info">
+            <span class="takeover-dot ${pinned ? 'is-pinned' : ''}"></span>
+            <span>${esc(rName)} · ${pinned ? '已固定手动' : `手动接管 ${sec}s`}</span>
+          </span>
+          <span class="takeover-actions">
+            ${pinned ? '' : `<button type="button" data-hold-room="${esc(rid)}">固定</button>`}
+            <button type="button" data-rel-room="${esc(rid)}">恢复自动</button>
+          </span>`;
+        bar.hidden = false;
+        return;
+      }
+      if (dues[rid] !== undefined) {
+        bar.innerHTML = `
+          <span class="takeover-info">
+            <span class="takeover-dot is-due"></span>
+            <span>${esc(rName)} · ${dues[rid]}s 后自动关灯</span>
+          </span>
+          <span class="takeover-actions">
+            <button type="button" data-hold-room="${esc(rid)}">保持手动</button>
+          </span>`;
+        bar.hidden = false;
+      }
     }
 
     function renderDevices() {
@@ -1511,8 +1563,11 @@
       }
       el('occMatrix').innerHTML = (localPlan?.rooms || []).filter(r => !r.restricted).map(r => {
         const occ = Boolean(snapshot.occupied?.[r.id]);
+        const ov = snapshot.overrides?.[r.id];
+        const isManual = ov !== undefined;
         return `<div class="occ-row">
           <span>${esc(r.name)}</span>
+          <button type="button" data-auto-toggle="${esc(r.id)}" aria-pressed="${isManual}">${ov === -1 ? '手动锁' : isManual ? `接管${ov}s` : '自动'}</button>
           <button type="button" data-dnd="${esc(r.id)}" aria-pressed="${Boolean(r.sleep)}">${r.sleep ? '免打扰' : '常规'}</button>
           <button type="button" data-occ="${esc(r.id)}" aria-pressed="${occ}">${occ ? '有人' : '无人'}</button>
         </div>`;
@@ -1880,6 +1935,22 @@
       if (rid === '__all__') { lookAtRoom(null); return; }
       if (walkMode && isScanMode() && walker) beginWalk(walker.roomPath(walker.avatar.position, rid));
       else lookAtRoom(rid);
+    };
+
+    el('takeoverBar').onclick = async e => {
+      const holdBtn = e.target.closest('[data-hold-room]');
+      if (holdBtn) {
+        try {
+          applySnapshot(await api.environment(currentKey, { hold_override: holdBtn.dataset.holdRoom }), false);
+        } catch (err) { showToast(err.message, true); }
+        return;
+      }
+      const relBtn = e.target.closest('[data-rel-room]');
+      if (relBtn) {
+        try {
+          applySnapshot(await api.environment(currentKey, { release_override: relBtn.dataset.relRoom }), false);
+        } catch (err) { showToast(err.message, true); }
+      }
     };
 
     el('roomLinks').onclick = e => {
@@ -2430,6 +2501,13 @@
     };
 
     el('occMatrix').onclick = async e => {
+      const autoBtn = e.target.closest('[data-auto-toggle]');
+      if (autoBtn) {
+        const rid = autoBtn.dataset.autoToggle;
+        const isManual = snapshot?.overrides?.[rid] !== undefined;
+        applySnapshot(await api.environment(currentKey, isManual ? { release_override: rid } : { hold_override: rid }), false);
+        return;
+      }
       const occBtn = e.target.closest('[data-occ]');
       if (occBtn) {
         const rid = occBtn.dataset.occ;
@@ -2519,7 +2597,20 @@
         if (ae && ae.tagName === 'INPUT') return;
         try {
           const v = await api.get(currentKey);
-          if (v.seq > (snapshot?.seq ?? 0)) applySnapshot(v, false);
+          if (v.seq > (snapshot?.seq ?? 0)) {
+            applySnapshot(v, false);
+          } else if (
+            snapshot &&
+            (Object.keys(snapshot.overrides || {}).length ||
+             Object.keys(v.overrides || {}).length ||
+             Object.keys(snapshot.due || {}).length ||
+             Object.keys(v.due || {}).length)
+          ) {
+            snapshot.overrides = v.overrides;
+            snapshot.due = v.due;
+            renderTakeoverBar();
+            if (el('envModal').open) renderEnvModal();
+          }
         } catch {}
       }, 1000);
     }).catch(err => showToast(err.message, true));

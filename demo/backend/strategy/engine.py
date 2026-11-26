@@ -12,6 +12,9 @@ from backend.control.service import ControlLayerService
 from backend.data.repository import IHomeRepository
 
 
+PINNED_UNTIL = 9_999_999_999.0
+
+
 class StrategyEngine:
     def __init__(self, repo: IHomeRepository, control: ControlLayerService):
         self.repo = repo
@@ -55,7 +58,12 @@ class StrategyEngine:
         if mode != "normal" and mode not in scenes:
             raise Problem(f"未知的场景模式：{mode}", 400)
 
-        m.update(mode=mode, overrides={}, due={})
+        now = time.time()
+        pinned_overrides = (
+            {} if mode in ("normal", "away")
+            else {rid: exp for rid, exp in m.get("overrides", {}).items() if exp > now + 7200}
+        )
+        m.update(mode=mode, overrides=pinned_overrides, due={})
         if mode == "normal":
             expl = "已切换回「日常手动模式」，释放场景接管并保持各设备当前确认状态。"
             m["last_explanation"] = expl
@@ -83,8 +91,11 @@ class StrategyEngine:
             curtain_pos = max(0, min(100, int(scene_cfg.get("curtain_position", 85))))
             for o in m["plan"]["items"]:
                 rm = room_for_item(m["plan"], o)
-                # P2 Zone Sleep DND Lock protection: skip sleeping elder/private bedrooms!
-                if rm and rm.get("sleep") and rm.get("zone") == "rest":
+                # P1 Pinned Manual Hold & P2 Zone Sleep DND Lock protection:
+                if rm and (
+                    (rm.get("sleep") and rm.get("zone") == "rest")
+                    or m.get("overrides", {}).get(rm["id"], 0) > now + 7200
+                ):
                     if rm["name"] not in skipped_rooms:
                         skipped_rooms.append(rm["name"])
                     continue
@@ -281,6 +292,32 @@ class StrategyEngine:
             notes.append(lock_msg)
 
         # 3. Climate, Humidity, Ambient Lux & Stale Sensor simulation
+        if "hold_override" in body:
+            hr_id = body["hold_override"]
+            r_target = next((r for r in m["plan"]["rooms"] if r["id"] == hr_id), None)
+            if not r_target:
+                raise Problem("找不到要锁定手动模式的房间。")
+            m["overrides"][hr_id] = PINNED_UNTIL
+            m["due"].pop(hr_id, None)
+            hold_msg = f"{r_target['name']} · 已固定手动控制（暂停传感器自动改写，可随时恢复自动）"
+            self.repo.record_event(key, None, "ok", hold_msg, source="manual")
+            notes.append(hold_msg)
+
+        if "release_override" in body:
+            rr_id = body["release_override"]
+            if rr_id == "__all__":
+                m["overrides"] = {}
+                rel_msg = "全屋已恢复自动感知托管"
+            else:
+                r_target = next((r for r in m["plan"]["rooms"] if r["id"] == rr_id), None)
+                if not r_target:
+                    raise Problem("找不到要恢复自动控制的房间。")
+                m["overrides"].pop(rr_id, None)
+                rel_msg = f"{r_target['name']} · 已交还自动感知托管"
+            self.repo.record_event(key, None, "ok", rel_msg, source="strategy")
+            notes.append(rel_msg)
+            if m.get("mode") in ("home", "sleep"):
+                notes.append(self.evaluate_climate(key, m, record=False, skip_sleep_locked=(m.get("mode") == "home")))
         if "climate" in body:
             q = body["climate"]
             if not isinstance(q, dict):
